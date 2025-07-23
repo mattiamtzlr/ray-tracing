@@ -1,6 +1,7 @@
+#include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 
 #include "color.h"
 #include "lodepng.h"
@@ -121,7 +122,7 @@ int main(void) {
 }
 
 
-bool hit_sphere(const point3_t center, double radius, const ray_t ray) {
+double hit_sphere(const point3_t center, double radius, const ray_t ray) {
     /* ray sphere intersection: for a sphere at center C and radius r, a point
      * P intersects the sphere if
      *     (C - P) * (C - P) = r^2.
@@ -136,20 +137,31 @@ bool hit_sphere(const point3_t center, double radius, const ray_t ray) {
     double b = -2.0 * vec3_dot(ray.direction, center_vec);
     double c = vec3_len_sqr(center_vec) - radius * radius;
     double discriminant = b * b - 4 * a * c;
-    return discriminant >= 0;
+
+    /* return hit distance */
+    if (discriminant < 0)
+        return -1;
+    return (-b - sqrt(discriminant)) / (2 * a);
 }
 
 color_t ray_color(const ray_t ray) {
     /* test sphere at z = -1 */
-    if (hit_sphere((point3_t){0, 0, -1}, 0.5, ray))
-        return (color_t){1, 0, 0};
+    point3_t sphere_center = {0, 0, -1};
+    double t = hit_sphere(sphere_center, 0.5, ray);
+    if (t > 0) {
+        vec3_t normal = vec3_unit(vec3_sub(ray_at(ray, t), sphere_center));
+        return vec3_mul_s(
+            (color_t){normal.x + 1, normal.y + 1, normal.z + 1},
+            0.5
+        );
+    }
 
     /* background: simple gradient */
     vec3_t unit_dir = vec3_unit(ray.direction);
 
     double a = 0.5 * (unit_dir.y + 1.0);
     color_t color1 = {1.0, 1.0, 1.0};
-    color_t color2 = {0.8, 0.4, 1.0};
+    color_t color2 = {0.5, 0.3, 1.0};
 
     return vec3_add(vec3_mul_s(color1, 1.0 - a), vec3_mul_s(color2, a));
 }
