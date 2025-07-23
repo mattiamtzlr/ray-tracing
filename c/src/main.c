@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdbool.h>
 
 #include "color.h"
 #include "lodepng.h"
@@ -18,6 +19,12 @@ int main(void) {
     double aspect_ratio = 16.0 / 9.0;
     const unsigned int image_width = 480; /* NOTE: IMG WIDTH */
     const unsigned int image_height = (int)(image_width / aspect_ratio);
+
+
+    /* coordinate system, centered at camera:
+     *   x points to the right
+     *   y points up
+     *   z points forward, i.e. the viewing direction is negative z */
 
 
     /* camera */
@@ -114,7 +121,29 @@ int main(void) {
 }
 
 
+bool hit_sphere(const point3_t center, double radius, const ray_t ray) {
+    /* ray sphere intersection: for a sphere at center C and radius r, a point
+     * P intersects the sphere if
+     *     (C - P) * (C - P) = r^2.
+     *
+     * substituting P for our ray P(t) = Q + td and solving for t, we get
+     *     (t^2)*d*d - 2td*(C-Q) + ((C-Q) * (C-Q) - r^2) = 0
+     * which can be solved quadratically, where 1 or 2 roots correspond to an
+     * intersection. */
+
+    vec3_t center_vec = vec3_sub(center, ray.origin);
+    double a = vec3_len_sqr(ray.direction);
+    double b = -2.0 * vec3_dot(ray.direction, center_vec);
+    double c = vec3_len_sqr(center_vec) - radius * radius;
+    double discriminant = b * b - 4 * a * c;
+    return discriminant >= 0;
+}
+
 color_t ray_color(const ray_t ray) {
+    /* test sphere at z = -1 */
+    if (hit_sphere((point3_t){0, 0, -1}, 0.5, ray))
+        return (color_t){1, 0, 0};
+
     /* background: simple gradient */
     vec3_t unit_dir = vec3_unit(ray.direction);
 
