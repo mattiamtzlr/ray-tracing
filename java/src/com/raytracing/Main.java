@@ -274,6 +274,7 @@ public class Main {
             System.out.printf("Error while writing to '%s'.\n", fileName);
         }
 
+        bob.close();
     }
 
     // function to figure out what color the ray returns
