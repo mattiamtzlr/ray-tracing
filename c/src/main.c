@@ -10,7 +10,7 @@
 
 
 /* writes the color for the given ray or NULL into `res` */
-color_t *ray_color(color_t *res, const ray_t *ray);
+color_t ray_color(const ray_t ray);
 
 
 int main(void) {
@@ -32,29 +32,26 @@ int main(void) {
     vec3_t viewport_v = {0, -viewport_height, 0};
 
     /* horizontal and vertical delta vectors from pixel to pixel */
-    vec3_t pixel_delta_u = {0};
-    vec3_div_s(&pixel_delta_u, &viewport_u, image_width);
-    vec3_t pixel_delta_v = {0};
-    vec3_div_s(&pixel_delta_v, &viewport_v, image_height);
+    vec3_t pixel_delta_u = vec3_div_s(viewport_u, image_width);
+    vec3_t pixel_delta_v = vec3_div_s(viewport_v, image_height);
 
     /* location of upper left pixel:
      * viewport_upper_left = camera_center - vec3(0, 0, focal_length)
      *                                     - viewport_u/2 - viewport_v/2 */
-    point3_t viewport_upper_left = {0};
-    vec3_t tmp = {0, 0, focal_length};
-    vec3_sub(&viewport_upper_left, &camera_center, &tmp);
-    vec3_div_s(&tmp, &viewport_u, 2);
-    vec3_sub(&viewport_upper_left, &viewport_upper_left, &tmp);
-    vec3_div_s(&tmp, &viewport_v, 2);
-    vec3_sub(&viewport_upper_left, &viewport_upper_left, &tmp);
+    point3_t viewport_upper_left = vec3_sub(
+        camera_center,
+        vec3_add(
+            (vec3_t){0, 0, focal_length},
+            vec3_add(vec3_div_s(viewport_u, 2), vec3_div_s(viewport_v, 2))
+        )
+    );
 
     /* upper_left_pixel
      *     = viewport_upper_left + 0.5 * (pixel_delta_u + pixel_delta_v) */
-    point3_t upper_left_pixel = {0};
-    vec3_add(&tmp, &pixel_delta_u, &pixel_delta_v);
-    vec3_mul_s(&tmp, &tmp, 0.5);
-    vec3_add(&upper_left_pixel, &viewport_upper_left, &tmp);
-
+    point3_t upper_left_pixel = vec3_add(
+        viewport_upper_left,
+        vec3_mul_s(vec3_add(pixel_delta_u, pixel_delta_v), 0.5)
+    );
 
 
     /* allocate image, use three color channels */
@@ -70,26 +67,24 @@ int main(void) {
     /* render left-to-right, top-to-bottom */
     for (unsigned int row = 0; row < image_height; row++) {
         /* progress indicator */
-        printf("\rScanlines remaining: %u", image_height - row);
+        printf("\rScanlines remaining: %4u", image_height - row);
         fflush(stdout);
 
         for (unsigned int col = 0; col < image_width; col++) {
-            vec3_t tmp = {0};
-
             /* pixel_center = upper_left_pixel
-             *                  + (col * pixel_delta_u) + (j * pixel_delta_v) */
-            point3_t pixel_center = {0};
-            vec3_mul_s(&tmp, &pixel_delta_u, col);
-            vec3_add(&pixel_center, &upper_left_pixel, &tmp);
-            vec3_mul_s(&tmp, &pixel_delta_v, row);
-            vec3_add(&pixel_center, &pixel_center, &tmp);
+             *                  + (col * pixel_delta_u) + (row * pixel_delta_v) */
+            point3_t pixel_center = vec3_add(
+                upper_left_pixel,
+                vec3_add(
+                    vec3_mul_s(pixel_delta_u, col),
+                    vec3_mul_s(pixel_delta_v, row)
+                )
+            );
 
-            vec3_t ray_direction = {0};
-            vec3_sub(&ray_direction, &pixel_center, &camera_center);
-            ray_t ray = {&camera_center, &ray_direction};
+            vec3_t ray_direction = vec3_sub(pixel_center, camera_center);
+            ray_t ray = {camera_center, ray_direction};
 
-            color_t pixel_color = {0};
-            ray_color(&pixel_color, &ray);
+            color_t pixel_color = ray_color(ray);
 
             /* scaled values, ranging from 0 to 255, for writing */
             unsigned char ir = (unsigned char)(255.999 * pixel_color.x);
@@ -119,21 +114,14 @@ int main(void) {
 }
 
 
-color_t *ray_color(color_t *res, const ray_t *ray) {
-    if (res != NULL) {
-        /* background: simple gradient */
-        vec3_t unit_dir = {0};
-        vec3_unit(&unit_dir, ray->direction);
+color_t ray_color(const ray_t ray) {
+    /* background: simple gradient */
+    vec3_t unit_dir = vec3_unit(ray.direction);
 
-        double a = 0.5 * (unit_dir.y + 1.0);
-        color_t color1 = {1.0, 1.0, 1.0};
-        color_t color2 = {0.8, 0.4, 1.0};
+    double a = 0.5 * (unit_dir.y + 1.0);
+    color_t color1 = {1.0, 1.0, 1.0};
+    color_t color2 = {0.8, 0.4, 1.0};
 
-        color_t tmp = {0};
-        vec3_mul_s(res, &color1, 1.0 - a);
-        vec3_mul_s(&tmp, &color2, a);
-        vec3_add(res, res, &tmp);
-    }
-    return res;
+    return vec3_add(vec3_mul_s(color1, 1.0 - a), vec3_mul_s(color2, a));
 }
 
