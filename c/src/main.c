@@ -1,42 +1,56 @@
 #include <stdio.h>
-#include <unistd.h>
+#include <stdlib.h>
 
-#define OUTPUT_PPM "output.ppm"
-#define OUTPUT OUTPUT_PPM
+#include "lodepng.h"
+
+#define OUTPUT "output.png"
 
 int main(void) {
-    const int image_width = 256;
-    const int image_height = 256;
+    const unsigned int image_width = 256;
+    const unsigned int image_height = 256;
+    /* three color channels */
+    const size_t image_size = image_width * image_height * 3;
 
-    FILE *out = fopen(OUTPUT, "w");
-
-    /* P3                   // ASCII colors
-     * <width> <height>     // in pixels
-     * 255                  // use max color */
-    fprintf(out, "P3\n%d %d\n255\n", image_width, image_height);
+    unsigned char *image = malloc(image_size);
+    if (image == NULL) {
+        fputs("Memory allocation of image failed", stderr);
+        return 1;
+    }
 
     /* write left-to-right, top-to-bottom */
-    for (int row = 0; row < image_height; row++) {
+    for (unsigned int row = 0; row < image_height; row++) {
         /* progress indicator */
-        printf("\rScanlines remaining: %d", image_height - row);
+        printf("\rScanlines remaining: %u", image_height - row);
         fflush(stdout);
 
-        for (int col = 0; col < image_width; col++) {
+        for (unsigned int col = 0; col < image_width; col++) {
             /* real values, ranging from 0.0 to 1.0 */
             double r = (double)col / (image_width - 1);
             double g = (double)row / (image_height - 1);
-            double b = (double)(image_width - col) / (image_width - 1);
+            double b = 0 * (double)(image_width - col) / (image_width - 1);
 
             /* scaled values, ranging from 0 to 255, for writing */
-            int ir = (int)(255.999 * r);
-            int ig = (int)(255.999 * g);
-            int ib = (int)(255.999 * b);
+            unsigned char ir = (unsigned char)(255.999 * r);
+            unsigned char ig = (unsigned char)(255.999 * g);
+            unsigned char ib = (unsigned char)(255.999 * b);
 
-            fprintf(out, "%d %d %d\n", ir, ig, ib);
+            /* current index in image */
+            size_t img_index = 3 * (row * image_width + col);
+            image[img_index + 0] = ir;
+            image[img_index + 1] = ig;
+            image[img_index + 2] = ib;
         }
     }
 
-    printf("\rSuccessfully wrote to %s\n", OUTPUT);
-    fclose(out);
-    return 0;
+    /* some error handling */
+    unsigned int error =
+        lodepng_encode24_file(OUTPUT, image, image_width, image_height);
+
+    if (error)
+        fprintf(stderr, "\rPNG encoding error %u: %s\n", error, lodepng_error_text(error));
+    else
+        printf("\rSuccessfully wrote to %s\n", OUTPUT);
+
+    free(image);
+    return error != 0;
 }
